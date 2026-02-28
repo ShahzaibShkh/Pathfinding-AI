@@ -34,6 +34,6 @@ python main.py
 - **Left Click**: Draw Start Node (Green). Second click draws End Node (Red). Further clicks draw Walls (Black).
 - **Hold Left Click & Drag**: Easily populate large amounts of walls.
 - **Right Click / Drag**: Erase nodes turning them back into plain open tiles.
-- **Algo Button (Bottom Left)**: Click to toggle between algorithms (`BFS`, `DFS`, `Dijkstra`, `A*`, `Greedy`)
-- **Start Search (Bottom Middle)**: Tell the algorithm to execute and discover the path!
-- **Reset (Bottom Right)**: Wipe the entire grid and start from a blank canvas.
+- **Side Panel Algorithms List**: Click on any algorithm name (`BFS`, `DFS`, `Dijkstra`, `A*`, `Greedy`) in the right-side panel to set it as the active search.
+- **Start Search**: Click the Start Search button in the side panel to execute the algorithm!
+- **Reset**: Click the Reset button in the side panel to wipe the entire grid and start from a blank canvas.

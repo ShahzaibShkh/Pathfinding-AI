@@ -8,9 +8,10 @@ import math
 pygame.init()
 
 # Constants
-WIDTH = 800
+GRID_WIDTH = 800
+PANEL_WIDTH = 250
+WIDTH = GRID_WIDTH + PANEL_WIDTH
 HEIGHT = 800
-BUTTON_HEIGHT = 60
 ROWS = 50
 
 # Colors
@@ -19,12 +20,13 @@ BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 GREY = (128, 128, 128)
-LIGHT_GREY = (200, 200, 200)
+LIGHT_GREY = (220, 220, 220)
+DARK_GREY = (50, 50, 50)
 TURQUOISE = (64, 224, 208)
 PURPLE = (128, 0, 128)
 YELLOW = (255, 255, 0)
 
-WIN = pygame.display.set_mode((WIDTH, HEIGHT + BUTTON_HEIGHT))
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Pathfinding Visualizer")
 
 class Node:
@@ -317,34 +319,70 @@ def draw_grid_lines(win, rows, width):
         for j in range(rows):
             pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
 
-def draw_buttons(win, current_algo):
-    pygame.draw.rect(win, LIGHT_GREY, (0, HEIGHT, WIDTH, BUTTON_HEIGHT))
-    font = pygame.font.SysFont('Arial', 32)
+def draw_panel(win, current_algo_idx, algorithms):
+    pygame.draw.rect(win, LIGHT_GREY, (GRID_WIDTH, 0, PANEL_WIDTH, HEIGHT))
     
-    # Button 1: Toggle Algorithm
-    pygame.draw.rect(win, (150, 150, 200), (0, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
-    text_algo = font.render(f'Algo: {current_algo}', True, BLACK)
-    win.blit(text_algo, text_algo.get_rect(center=(WIDTH//6, HEIGHT + BUTTON_HEIGHT // 2)))
+    font = pygame.font.SysFont('Arial', 24)
+    font_bold = pygame.font.SysFont('Arial', 28, bold=True)
+    inst_font = pygame.font.SysFont('Arial', 24)
+    
+    # Title
+    title = font_bold.render("Algorithms:", True, BLACK)
+    win.blit(title, (GRID_WIDTH + 20, 20))
+    
+    # Algorithms
+    for i, algo in enumerate(algorithms):
+        y_pos = 70 + i * 40
+        if i == current_algo_idx:
+            # Highlight with a visually distinct line and arrow
+            pygame.draw.rect(win, (180, 200, 255), (GRID_WIDTH + 10, y_pos - 2, PANEL_WIDTH - 20, 32))
+            text = font.render(f"> {algo}", True, RED)
+        else:
+            text = font.render(f"  {algo}", True, BLACK)
+            
+        win.blit(text, (GRID_WIDTH + 20, y_pos))
+        
+    start_y = 70 + len(algorithms) * 40 + 40
+    
+    # Instructions Title
+    inst_title = font_bold.render("Instructions:", True, BLACK)
+    win.blit(inst_title, (GRID_WIDTH + 20, start_y))
+    
+    instructions = [
+        "Left Click:",
+        " - Place Start (Green)",
+        " - Place End (Red)",
+        " - Draw Walls",
+        "",
+        "Right Click:",
+        " - Erase Nodes",
+        "",
+        "Click on an algorithm",
+        "above to select it."
+    ]
+    
+    for i, line in enumerate(instructions):
+        text = inst_font.render(line, True, DARK_GREY)
+        win.blit(text, (GRID_WIDTH + 20, start_y + 40 + i * 30))
+        
+    # Standard Buttons
+    pygame.draw.rect(win, (150, 200, 150), (GRID_WIDTH + 20, HEIGHT - 140, PANEL_WIDTH - 40, 50))
+    start_text = font.render("Start Search", True, BLACK)
+    win.blit(start_text, start_text.get_rect(center=(GRID_WIDTH + PANEL_WIDTH // 2, HEIGHT - 115)))
 
-    # Button 2: Start
-    pygame.draw.rect(win, (150, 200, 150), (WIDTH//3, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
-    text_start = font.render('Start Search', True, BLACK)
-    win.blit(text_start, text_start.get_rect(center=(WIDTH//2, HEIGHT + BUTTON_HEIGHT // 2)))
+    pygame.draw.rect(win, (200, 150, 150), (GRID_WIDTH + 20, HEIGHT - 70, PANEL_WIDTH - 40, 50))
+    reset_text = font.render("Reset", True, BLACK)
+    win.blit(reset_text, reset_text.get_rect(center=(GRID_WIDTH + PANEL_WIDTH // 2, HEIGHT - 45)))
 
-    # Button 3: Reset
-    pygame.draw.rect(win, (200, 150, 150), (2*WIDTH//3, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
-    text_reset = font.render('Reset', True, BLACK)
-    win.blit(text_reset, text_reset.get_rect(center=(5*WIDTH//6, HEIGHT + BUTTON_HEIGHT // 2)))
-
-def draw(win, grid, rows, width, current_algo):
+def draw(win, grid, rows, grid_width, current_algo_idx, algorithms):
     win.fill(WHITE)
     
     for row in grid:
         for node in row:
             node.draw(win)
             
-    draw_grid_lines(win, rows, width)
-    draw_buttons(win, current_algo)
+    draw_grid_lines(win, rows, grid_width)
+    draw_panel(win, current_algo_idx, algorithms)
     pygame.display.update()
 
 def get_clicked_pos(pos, rows, width):
@@ -355,7 +393,7 @@ def get_clicked_pos(pos, rows, width):
     return row, col
 
 def main():
-    grid = make_grid(ROWS, WIDTH)
+    grid = make_grid(ROWS, GRID_WIDTH)
     start = None
     end = None
     run = True
@@ -364,54 +402,41 @@ def main():
     current_algo_idx = 0
 
     while run:
-        draw(WIN, grid, ROWS, WIDTH, algorithms[current_algo_idx])
+        draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
 
-            # Left Click
+            # Left Click (Held down for drawing walls continuously)
             if pygame.mouse.get_pressed()[0]:
                 pos = pygame.mouse.get_pos()
+                x, y = pos
                 
-                # Check for buttons click
-                if pos[1] >= HEIGHT:
-                    if pos[0] < WIDTH // 3:
-                        # Toggle Mode
-                        # To debounce the click, we can wait until mouse button goes up or just process one toggle per click event
-                        # But since it's checking in the loop it might flicker if held.
-                        # We should process button clicks only on MOUSEBUTTONDOWN to avoid rapid toggling
-                        pass
-                    elif pos[0] < 2 * WIDTH // 3:
-                        # Start Search
-                        pass
-                    else:
-                        # Reset
-                        start = None
-                        end = None
-                        grid = make_grid(ROWS, WIDTH)
-                    continue
-                
-                # Grid click
-                row, col = get_clicked_pos(pos, ROWS, WIDTH)
-                if row < ROWS and col < ROWS:
-                    node = grid[row][col]
-                    
-                    if not start and node != end:
-                        start = node
-                        start.make_start()
-                    elif not end and node != start:
-                        end = node
-                        end.make_end()
-                    elif node != end and node != start:
-                        node.make_wall()
+                # Only check grid space clicks while holding left click
+                # Side Panel clicks are handled specifically below for exact clicks
+                if x < GRID_WIDTH:
+                    # Grid click
+                    row, col = get_clicked_pos(pos, ROWS, GRID_WIDTH)
+                    if row < ROWS and col < ROWS:
+                        node = grid[row][col]
+                        
+                        if not start and node != end and not node.is_wall():
+                            start = node
+                            start.make_start()
+                        elif not end and node != start and not node.is_wall():
+                            end = node
+                            end.make_end()
+                        elif node != end and node != start:
+                            node.make_wall()
 
             # Right Click (Erase)
             elif pygame.mouse.get_pressed()[2]:
                 pos = pygame.mouse.get_pos()
+                x, y = pos
                 
-                if pos[1] < HEIGHT:
-                    row, col = get_clicked_pos(pos, ROWS, WIDTH)
+                if x < GRID_WIDTH:
+                    row, col = get_clicked_pos(pos, ROWS, GRID_WIDTH)
                     if row < ROWS and col < ROWS:
                         node = grid[row][col]
                         node.reset()
@@ -424,12 +449,16 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     pos = pygame.mouse.get_pos()
-                    if pos[1] >= HEIGHT:
-                        if pos[0] < WIDTH // 3:
-                            # Toggle Mode
-                            current_algo_idx = (current_algo_idx + 1) % len(algorithms)
-                        elif pos[0] < 2 * WIDTH // 3:
-                            # Start Search
+                    x, y = pos
+                    if x >= GRID_WIDTH:
+                        # Check Algorithm clicks
+                        for i, algo in enumerate(algorithms):
+                            y_pos = 70 + i * 40
+                            if y_pos - 2 <= y <= y_pos + 30:
+                                current_algo_idx = i
+                                
+                        # Check Start Button
+                        if HEIGHT - 140 <= y <= HEIGHT - 90:
                             if start and end:
                                 clear_paths(grid)
                                 for row in grid:
@@ -438,15 +467,21 @@ def main():
                                         
                                 algo_name = algorithms[current_algo_idx]
                                 if algo_name == "BFS":
-                                    bfs(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                    bfs(lambda: draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms), grid, start, end)
                                 elif algo_name == "DFS":
-                                    dfs(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                    dfs(lambda: draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms), grid, start, end)
                                 elif algo_name == "Dijkstra":
-                                    dijkstra(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                    dijkstra(lambda: draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms), grid, start, end)
                                 elif algo_name == "A*":
-                                    astar(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                    astar(lambda: draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms), grid, start, end)
                                 elif algo_name == "Greedy":
-                                    greedy_best_first(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                    greedy_best_first(lambda: draw(WIN, grid, ROWS, GRID_WIDTH, current_algo_idx, algorithms), grid, start, end)
+                        
+                        # Check Reset Button
+                        elif HEIGHT - 70 <= y <= HEIGHT - 20:
+                            start = None
+                            end = None
+                            grid = make_grid(ROWS, GRID_WIDTH)
 
     pygame.quit()
     sys.exit()

@@ -1,6 +1,7 @@
 import pygame
 import sys
 from collections import deque
+from queue import PriorityQueue
 
 # Initialize pygame
 pygame.init()
@@ -83,6 +84,104 @@ def reconstruct_path(came_from, current, draw):
         if current.color != GREEN:
             current.make_path()
         draw()
+
+def h(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    return abs(x1 - x2) + abs(y1 - y2)
+
+def astar(draw, grid, start, end):
+    count = 0
+    open_set = PriorityQueue()
+    open_set.put((0, count, start))
+    came_from = {}
+    g_score = {node: float("inf") for row in grid for node in row}
+    g_score[start] = 0
+    f_score = {node: float("inf") for row in grid for node in row}
+    f_score[start] = h(start.get_pos(), end.get_pos())
+    
+    open_set_hash = {start}
+    
+    while not open_set.empty():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+        current = open_set.get()[2]
+        open_set_hash.remove(current)
+        
+        if current == end:
+            reconstruct_path(came_from, end, draw)
+            end.make_end()
+            start.make_start()
+            return True
+            
+        for neighbor in current.neighbors:
+            temp_g_score = g_score[current] + 1
+            
+            if temp_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = temp_g_score
+                f_score[neighbor] = temp_g_score + h(neighbor.get_pos(), end.get_pos())
+                if neighbor not in open_set_hash:
+                    count += 1
+                    open_set.put((f_score[neighbor], count, neighbor))
+                    open_set_hash.add(neighbor)
+                    if neighbor != end:
+                        neighbor.make_open()
+                        
+        draw()
+        
+        if current != start and current != end:
+            current.make_closed()
+            
+    return False
+
+def dijkstra(draw, grid, start, end):
+    count = 0
+    open_set = PriorityQueue()
+    open_set.put((0, count, start))
+    came_from = {}
+    g_score = {node: float("inf") for row in grid for node in row}
+    g_score[start] = 0
+    
+    open_set_hash = {start}
+    
+    while not open_set.empty():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+        current = open_set.get()[2]
+        open_set_hash.remove(current)
+        
+        if current == end:
+            reconstruct_path(came_from, end, draw)
+            end.make_end()
+            start.make_start()
+            return True
+            
+        for neighbor in current.neighbors:
+            temp_g_score = g_score[current] + 1
+            
+            if temp_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = temp_g_score
+                if neighbor not in open_set_hash:
+                    count += 1
+                    open_set.put((g_score[neighbor], count, neighbor))
+                    open_set_hash.add(neighbor)
+                    if neighbor != end:
+                        neighbor.make_open()
+                        
+        draw()
+        
+        if current != start and current != end:
+            current.make_closed()
+            
+    return False
 
 def bfs(draw, grid, start, end):
     queue = deque([start])
@@ -175,26 +274,26 @@ def draw_grid_lines(win, rows, width):
         for j in range(rows):
             pygame.draw.line(win, GREY, (j * gap, 0), (j * gap, width))
 
-def draw_buttons(win):
+def draw_buttons(win, current_algo):
     pygame.draw.rect(win, LIGHT_GREY, (0, HEIGHT, WIDTH, BUTTON_HEIGHT))
     font = pygame.font.SysFont('Arial', 32)
     
-    # Button 1: BFS
+    # Button 1: Toggle Algorithm
     pygame.draw.rect(win, (150, 150, 200), (0, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
-    text_bfs = font.render('Run BFS', True, BLACK)
-    win.blit(text_bfs, text_bfs.get_rect(center=(WIDTH//6, HEIGHT + BUTTON_HEIGHT // 2)))
+    text_algo = font.render(f'Algo: {current_algo}', True, BLACK)
+    win.blit(text_algo, text_algo.get_rect(center=(WIDTH//6, HEIGHT + BUTTON_HEIGHT // 2)))
 
-    # Button 2: DFS
+    # Button 2: Start
     pygame.draw.rect(win, (150, 200, 150), (WIDTH//3, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
-    text_dfs = font.render('Run DFS', True, BLACK)
-    win.blit(text_dfs, text_dfs.get_rect(center=(WIDTH//2, HEIGHT + BUTTON_HEIGHT // 2)))
+    text_start = font.render('Start Search', True, BLACK)
+    win.blit(text_start, text_start.get_rect(center=(WIDTH//2, HEIGHT + BUTTON_HEIGHT // 2)))
 
     # Button 3: Reset
     pygame.draw.rect(win, (200, 150, 150), (2*WIDTH//3, HEIGHT, WIDTH//3, BUTTON_HEIGHT))
     text_reset = font.render('Reset', True, BLACK)
     win.blit(text_reset, text_reset.get_rect(center=(5*WIDTH//6, HEIGHT + BUTTON_HEIGHT // 2)))
 
-def draw(win, grid, rows, width):
+def draw(win, grid, rows, width, current_algo):
     win.fill(WHITE)
     
     for row in grid:
@@ -202,7 +301,7 @@ def draw(win, grid, rows, width):
             node.draw(win)
             
     draw_grid_lines(win, rows, width)
-    draw_buttons(win)
+    draw_buttons(win, current_algo)
     pygame.display.update()
 
 def get_clicked_pos(pos, rows, width):
@@ -217,9 +316,12 @@ def main():
     start = None
     end = None
     run = True
+    
+    algorithms = ["BFS", "DFS", "Dijkstra", "A*"]
+    current_algo_idx = 0
 
     while run:
-        draw(WIN, grid, ROWS, WIDTH)
+        draw(WIN, grid, ROWS, WIDTH, algorithms[current_algo_idx])
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -232,21 +334,14 @@ def main():
                 # Check for buttons click
                 if pos[1] >= HEIGHT:
                     if pos[0] < WIDTH // 3:
-                        # BFS
-                        if start and end:
-                            clear_paths(grid)
-                            for row in grid:
-                                for node in row:
-                                    node.update_neighbors(grid)
-                            bfs(lambda: draw(WIN, grid, ROWS, WIDTH), grid, start, end)
+                        # Toggle Mode
+                        # To debounce the click, we can wait until mouse button goes up or just process one toggle per click event
+                        # But since it's checking in the loop it might flicker if held.
+                        # We should process button clicks only on MOUSEBUTTONDOWN to avoid rapid toggling
+                        pass
                     elif pos[0] < 2 * WIDTH // 3:
-                        # DFS
-                        if start and end:
-                            clear_paths(grid)
-                            for row in grid:
-                                for node in row:
-                                    node.update_neighbors(grid)
-                            dfs(lambda: draw(WIN, grid, ROWS, WIDTH), grid, start, end)
+                        # Start Search
+                        pass
                     else:
                         # Reset
                         start = None
@@ -281,6 +376,32 @@ def main():
                             start = None
                         elif node == end:
                             end = None
+                            
+            # Process MOUSEBUTTONDOWN for buttons to avoid rapid triggering if held
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    pos = pygame.mouse.get_pos()
+                    if pos[1] >= HEIGHT:
+                        if pos[0] < WIDTH // 3:
+                            # Toggle Mode
+                            current_algo_idx = (current_algo_idx + 1) % len(algorithms)
+                        elif pos[0] < 2 * WIDTH // 3:
+                            # Start Search
+                            if start and end:
+                                clear_paths(grid)
+                                for row in grid:
+                                    for node in row:
+                                        node.update_neighbors(grid)
+                                        
+                                algo_name = algorithms[current_algo_idx]
+                                if algo_name == "BFS":
+                                    bfs(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                elif algo_name == "DFS":
+                                    dfs(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                elif algo_name == "Dijkstra":
+                                    dijkstra(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                elif algo_name == "A*":
+                                    astar(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
 
     pygame.quit()
     sys.exit()

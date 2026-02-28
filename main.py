@@ -2,6 +2,7 @@ import pygame
 import sys
 from collections import deque
 from queue import PriorityQueue
+import math
 
 # Initialize pygame
 pygame.init()
@@ -89,6 +90,48 @@ def h(p1, p2):
     x1, y1 = p1
     x2, y2 = p2
     return abs(x1 - x2) + abs(y1 - y2)
+
+def h_euclidean(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+def greedy_best_first(draw, grid, start, end):
+    count = 0
+    open_set = PriorityQueue()
+    open_set.put((0, count, start))
+    came_from = {}
+    visited = {start}
+    
+    while not open_set.empty():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+        current = open_set.get()[2]
+        
+        if current == end:
+            reconstruct_path(came_from, end, draw)
+            end.make_end()
+            start.make_start()
+            return True
+            
+        for neighbor in current.neighbors:
+            if neighbor not in visited:
+                came_from[neighbor] = current
+                visited.add(neighbor)
+                count += 1
+                open_set.put((h_euclidean(neighbor.get_pos(), end.get_pos()), count, neighbor))
+                if neighbor != end:
+                    neighbor.make_open()
+                        
+        draw()
+        
+        if current != start and current != end:
+            current.make_closed()
+            
+    return False
 
 def astar(draw, grid, start, end):
     count = 0
@@ -317,7 +360,7 @@ def main():
     end = None
     run = True
     
-    algorithms = ["BFS", "DFS", "Dijkstra", "A*"]
+    algorithms = ["BFS", "DFS", "Dijkstra", "A*", "Greedy"]
     current_algo_idx = 0
 
     while run:
@@ -402,6 +445,8 @@ def main():
                                     dijkstra(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
                                 elif algo_name == "A*":
                                     astar(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
+                                elif algo_name == "Greedy":
+                                    greedy_best_first(lambda: draw(WIN, grid, ROWS, WIDTH, algo_name), grid, start, end)
 
     pygame.quit()
     sys.exit()
